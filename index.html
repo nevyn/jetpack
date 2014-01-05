@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Assfucker</title>
+    <script src="jquery-1.10.2.min.js"></script>
+    <script src="class.js"></script>
+    <script src="thing.js"></script>
+    <script src="dude.js"></script>
+  </head>
+  <body style="background-color: #000;">
+  	<canvas tabindex="1" id="canvas" width="640" height="480" style="border: 1px solid #fff;"></canvas>
+  </body>
+</html>
+
+<script>
+
+var canvas = $('#canvas');
+var context = canvas[0].getContext("2d");
+
+
+var Vector = Class.extend({
+	init : function(x, y) {
+		this.x = x;
+		this.y = y;
+	},
+
+	vectorFromAddedVector : function(v) {
+		return Vector.create(this.x + v.x, this.y + v.y);
+	}
+});
+
+
+
+var game = {
+	dude : null
+};
+
+game.dude = Dude.create();
+
+var pressing = {
+	32 : false,
+	37 : false,
+	39 : false
+};
+
+canvas.on('keydown', function(e) {
+	if(e.keyCode == 32 && !pressing['32']) { // Space
+		pressing['32'] = true;
+		game.dude.startJump();
+	} else if(e.keyCode == 37 && !pressing['37']) { // Left
+		pressing['37'] = true;
+		game.dude.moveLeft();
+	} else if(e.keyCode == 39 && !pressing['39']) { // Right
+		pressing['39'] = true;
+		game.dude.moveRight();
+	}
+}).on('keyup', function(e) {
+	if(e.keyCode == 32) {
+		pressing['32'] = false;
+		game.dude.stopJump();
+	} else if(e.keyCode == 37) { // Left
+		pressing['37'] = false;
+		game.dude.stopLeft();
+	} else if(e.keyCode == 39) { // Right
+		pressing['39'] = false;
+		game.dude.stopRight();
+	}
+});
+
+var mapw = 10;
+var maph = 10;
+
+var tilew = 16;
+var tileh = 16;
+
+var map = [
+	0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+	0, 1, 1, 1, 0,  0, 0, 0, 0, 0,
+	0, 0, 0, 1, 0,  0, 0, 0, 0, 0,
+	0, 0, 0, 1, 0,  1, 1, 1, 0, 0,
+
+	0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
+	0, 0, 1, 0, 0,  0, 1, 0, 0, 0,
+	0, 1, 1, 1, 1,  1, 1, 1, 0, 0
+];
+
+
+/*
+use requestAnimationFrame in the future
+*/
+
+context.fillStyle = '#f00';
+
+var delta = 60 / 1000;
+
+var getTile = function(x, y) {
+	if(x < 0 || x >= mapw || y < 0 || y >= maph) return 1;
+	return map[y * mapw + x];
+}
+
+var moveLinear = function(position, movement, size) {
+	var gx = position.x + movement.x * delta;
+	var gy = position.y;
+
+	var c = false, cx = false, cy = false;
+
+	if(movement.x < 0) {
+		var ex = Math.floor(gx);
+		var y = Math.floor(gy);
+		var y2 = Math.floor(gy + size.y - 0.1);
+
+		if(getTile(ex, y) > 0 || getTile(ex, y2) > 0) {
+			c = cx = true;
+			gx = ex + 1;
+		}
+	} else if(movement.x > 0) {
+		var ex = Math.floor(gx + size.x);
+		var y = Math.floor(gy);
+		var y2 = Math.floor(gy + size.y - 0.1);
+
+		if(getTile(ex, y) > 0 || getTile(ex, y2) > 0) {
+			c = cx = true;
+			gx = ex - size.x;
+		}
+	}
+
+	var gy = position.y + movement.y * delta;
+
+	if(movement.y < 0) {
+		var ey = Math.floor(gy);
+		var x = Math.floor(gx);
+		var x2 = Math.floor(gx + size.x - 0.1);
+
+		if(getTile(x, ey) > 0 || getTile(x2, ey) > 0) {
+			c = cy = true;
+			gy = ey + 1;
+		}
+	} else if(movement.y > 0) {
+		// Check if (middle) bottom is inside block
+		var ey = Math.floor(gy + size.y);
+		var x = Math.floor(gx);
+		var x2 = Math.floor(gx + size.x - 0.1);
+
+		if(getTile(x, ey) > 0 || getTile(x2, ey) > 0) {
+			c = cy = true;
+			gy = ey - size.y;
+		}
+	}
+
+	return {
+		collision : c,
+		collisionX : cx,
+		collisionY : cy,
+		position : Vector.create(gx, gy)
+	};
+}
+
+
+var update = function() {
+	// Man falls
+	game.dude.update();
+
+	context.clearRect(0,0, 640, 480);
+	context.fillStyle = '#fff';
+	
+	for(var y=0; y<mapw; y++) {
+		for(var x=0; x<maph; x++) {
+			if(map[y * mapw + x] > 0)
+				context.fillRect(x * tilew, y * tileh, tilew, tileh);
+		}
+	}
+
+	context.fillStyle = '#f00';
+	context.fillRect(game.dude.position.x * tilew, game.dude.position.y * tileh, game.dude.size.x * tilew, game.dude.size.y * tileh);
+};
+
+setInterval(update, 1000 / 60);
+
+</script>
