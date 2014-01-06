@@ -1,11 +1,12 @@
 var Dude = Thing.extend({
-	RunSpeed : 0.8,
+	RunSpeed : 0.9,
 
 	StillJumpSpeed : 0.3,	// Horizontal
 	RunJumpSpeed : 1,		//     "
 	JumpForce : 1.5,		// Vertical
 
 	ClimbSpeed : 1,
+	ClimbCorrectSpeed : 0.05,
 
 	// Different states the dude can be in, that affects physics differently
 	// Dude can only be in one of these at one time
@@ -68,6 +69,9 @@ var Dude = Thing.extend({
 
 		if(this.state == Dude.State.OnGround || this.state == Dude.State.Climbing)
 			this.jump();
+
+		if(this.state == Dude.State.Airborne && this.onLadder())
+			this.jump();
 	},
 
 	stopJump : function() {
@@ -110,13 +114,9 @@ var Dude = Thing.extend({
 
 
 	onLadder : function() {
-		// todo: Think we need to offset with half size too...
-		return game.getCollisionTile(Math.floor(this.position.x + this.size.x / 2), Math.floor(this.position.y + this.size.y / 2)) == game.CollisionTileTypes.Ladder;
-	},
-
-	startClimbing : function() {
-		// Center dude on ladder
-		this.position.x = Math.floor(this.position.x + this.size.x / 2) + 0.5 - this.size.x / 2;
+		var x = Math.floor(this.position.x + this.size.x / 2);
+		return game.getCollisionTile(x, Math.floor(this.position.y + this.size.y / 2)) == game.CollisionTileTypes.Ladder ||
+				game.getCollisionTile(x, Math.floor(this.position.y + this.size.y)) == game.CollisionTileTypes.Ladder;
 	},
 
 
@@ -149,8 +149,14 @@ var Dude = Thing.extend({
 			if(!res.collisionY) {
 				// ... should probably kill x vel here
 				// todo NEEDS MOAR WORK
+				this.velocity.x = 0;
 				this.jumpType = Dude.JumpType.Still;
 				this.state = Dude.State.Airborne;
+			}
+
+			// Check for ladders
+			if(climbing && this.onLadder()) {
+				this.state = Dude.State.Climbing;
 			}
 
 			// We have velocity already?
@@ -171,6 +177,11 @@ var Dude = Thing.extend({
 					this.velocity.x = this.direction * Dude.RunJumpSpeed;
 			}
 
+			// Look for ladders
+			// Only look on fall so that we can jump up a ladder
+			if(this.onLadder() && this.velocity.y > 0)
+				this.state = Dude.State.Climbing;
+
 			res = game.moveLinear(this.position, this.velocity, this.size);
 			this.position = res.position;
 
@@ -188,6 +199,52 @@ var Dude = Thing.extend({
 
 		} else if(this.state == Dude.State.Climbing) {
 
+			// Exit: Moving down and touching solid changes to OnGround
+			// Exit: Not on ladder anymore => Airborne
+
+			// Can move around freely on ladder
+			// Basically, as long as midpoint of Dude is inside ladder,
+			// free control in all four directions
+			if(this.movingUp)
+				this.velocity.y = -Dude.ClimbSpeed;
+			else if(this.movingDown)
+				this.velocity.y = Dude.ClimbSpeed;
+			else
+				this.velocity.y = 0;
+
+			if(running) {
+				this.velocity.x = this.direction * Dude.RunSpeed;
+			} else {
+				this.velocity.x = 0;
+			}
+
+			// Try to correct x position to middle of ladder if not running
+			if(climbing && !running) {
+				var goalx = Math.floor(this.position.x + this.size.x / 2) + 0.5 - this.size.x / 2;
+				if(this.position.x > goalx) {
+					this.position.x -= Dude.ClimbCorrectSpeed;
+					if(this.position.x < goalx)
+						this.position.x = goalx;
+				}
+				if(this.position.x < goalx) {
+					this.position.x += Dude.ClimbCorrectSpeed;
+					if(this.position.x > goalx)
+						this.position.x = goalx;
+				}
+			}
+
+			res = game.moveLinear(this.position, this.velocity, this.size);
+			this.position = res.position;
+
+			if(this.movingDown && res.collisionY)
+				this.state = Dude.State.OnGround;
+
+			if(!this.onLadder()) {
+				this.state = Dude.State.Airborne;
+				this.jumpType = Dude.JumpType.Still;
+				this.velocity.x = 0;
+				this.velocity.y = 0;
+			}
 		}
 	}
 });

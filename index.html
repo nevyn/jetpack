@@ -7,6 +7,7 @@
     <script src="class.js"></script>
     <script src="thing.js"></script>
     <script src="monsters.js"></script>
+    <script src="world.js"></script>
     <script src="dude.js"></script>
   </head>
   <body style="background-color: #000;">
@@ -22,10 +23,44 @@ var context = canvas[0].getContext("2d");
 var mapw = 10;
 var maph = 10;
 
-var tilew = 16;
-var tileh = 16;
+var tilew = 32;
+var tileh = 32;
 
 var delta = 60 / 1000;
+
+
+var drawTile = function(x, y) {
+	var t = game.getCollisionTile(x, y);
+	if(t == game.CollisionTileTypes.Solid) {
+		if(rockTexture.loaded) {
+			context.drawImage(rockTexture.image, x * tilew, y * tileh, tilew, tileh);
+		}
+	} else if(t == game.CollisionTileTypes.Ladder) {
+		if(ladderTexture.loaded) {
+			context.drawImage(ladderTexture.image, x * tilew, y * tileh, tilew, tileh);
+		}
+	} else {
+		context.fillStyle = '#fff';
+		context.fillRect(x * tilew, y * tileh, tilew, tileh);
+	}
+}
+
+Texture = Class.extend({
+	init : function(image) {
+		this.loaded = false;
+		this.image = new Image();
+
+		var s = this;
+		this.image.onload = function() { s.loaded = true; }
+		this.image.src = image;
+	}
+});
+
+
+var ladderTexture = Texture.create('ladder.png');
+var rockTexture = Texture.create('rock.png');
+var springTexture = Texture.create('spring.png');
+
 
 var game = {
 	CollisionTileTypes : {
@@ -51,12 +86,12 @@ var game = {
 		0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
-		0, 0, 0, 1, 2,  1, 1, 0, 0, 0,
+		0, 0, 0, 1, 1,  1, 1, 2, 0, 0,
 
-		0, 0, 0, 0, 2,  0, 0, 0, 0, 0,
-		0, 0, 0, 0, 2,  0, 0, 0, 0, 0,
+		0, 0, 0, 0, 2,  0, 0, 2, 0, 0,
+		0, 0, 0, 0, 2,  2, 2, 2, 0, 0,
 		0, 0, 2, 0, 2,  0, 0, 0, 0, 0,
-		0, 0, 0, 0, 2,  0, 0, 0, 0, 0,
+		0, 0, 0, 0, 2,  1, 1, 0, 0, 0,
 		0, 0, 1, 1, 1,  1, 1, 1, 0, 0
 	],
 
@@ -71,7 +106,7 @@ var game = {
 		0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0,  0, 0, 0, 0, 0,
-		0, 0, 1, 1, 2,  2, 0, 0, 0, 0
+		0, 0, 0, 0, 0,  0, 0, 0, 0, 0
 	],
 
 	getCollisionTile : function(x, y) {
@@ -98,10 +133,10 @@ var game = {
 	},
 
 	update : function() {
-		this.dude.update();
+		this.dude.update(delta);
 
 		for(var i=0; i < this.monsters.length; i++)
-			this.monsters[i].update();
+			this.monsters[i].update(delta);
 
 		for(var i=0; i < this.buttons.length; i++) {
 			if(collide(this.dude, this.buttons[i])) {
@@ -266,7 +301,7 @@ var game = {
 		for(var y=0; y<mapw; y++) {
 			for(var x=0; x<maph; x++) {
 				if(this.collisionMap[y * mapw + x] > 0)
-					context.fillRect(x * tilew, y * tileh, tilew, tileh);
+					drawTile(x,y);
 			}
 		}
 
@@ -276,7 +311,10 @@ var game = {
 		context.fillStyle = '#f00';
 		for(var i=0; i < this.monsters.length; i++) {
 			var m = this.monsters[i];
-			context.fillRect(m.position.x * tilew, m.position.y * tileh, m.size.x * tilew, m.size.y * tileh);
+			if(springTexture.loaded) {
+				context.drawImage(springTexture.image, m.position.x * tilew, m.position.y * tileh, m.size.x * tilew, m.size.y * tileh);
+			}
+			//context.fillRect(m.position.x * tilew, m.position.y * tileh, m.size.x * tilew, m.size.y * tileh);
 		}
 
 		context.fillStyle = '#0f0';
@@ -289,13 +327,13 @@ var game = {
 
 game.dude = Dude.create();
 
-/*var spring = Spring.create();
-spring.position.x = 2;
-spring.position.y = 3;
+var spring = Spring.create();
+spring.position.x = 6;
+spring.position.y = 5;
 
 game.monsters.push(spring);
 
-spring = Spring.create();
+/*spring = Spring.create();
 spring.position.x = 2;
 spring.position.y = 3;
 spring.direction = Spring.Direction.Horizontal;
@@ -315,34 +353,8 @@ wh.position.y = 0;
 
 game.monsters.push(wh);*/
 
-// Prevent key repeats
-var pressing = {
-	32 : false,
-	37 : false,
-	38 : false,
-	39 : false,
-	40 : false
-};
 
 
-var Button = Thing.extend({
-	Mode : { Use : 0, Touch : 1 },
-
-	init : function() {
-		this.mode = Button.Mode.Touch;
-	},
-
-	touchedBy : function(thing) {
-		// We don't really care what touched the button
-		if(this.mode == Button.Mode.Touch)
-			this.invoke('activated');
-	},
-
-	usedByPlayer : function() {
-		if(this.mode == Button.Mode.Use)
-			this.invoke('activated');
-	}
-});
 
 /*button = Button.create();
 button.position.x = 4;
@@ -352,6 +364,18 @@ game.buttons.push(button);
 
 button.addOutput('activated', spring, 'changeDirection', [ Spring.Direction.Vertical ]);
 */
+
+
+
+// Prevent key repeats
+var pressing = {
+	32 : false,
+	37 : false,
+	38 : false,
+	39 : false,
+	40 : false
+};
+
 canvas.on('keydown', function(e) {
 	if(e.keyCode == 32 && !pressing['32']) { // Space
 		pressing['32'] = true;

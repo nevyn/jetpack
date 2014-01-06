@@ -1,23 +1,39 @@
 Spring = Thing.extend({
-	Speed : 1,
+	Speed : 0.8,
 	Direction : { Vertical : 0, Horizontal : 1 },
+	TurnTime : 0.5,
+
+	State : { Moving : 0, Turning: 1 },
 
 	init : function() {
 		this.vert = Vector.create(0, Spring.Speed);
 		this.hor = Vector.create(Spring.Speed, 0);
 
 		this.direction = Spring.Direction.Vertical;
+		this.state = Spring.State.Moving;
+		this.turnCounter = 0;
 	},
 
-	update : function() {
-		var res = game.moveLinear(this.position, this.direction == Spring.Direction.Vertical ? this.vert : this.hor, this.size);
-		this.position = res.position;
+	update : function(delta) {
+		if(this.state == Spring.State.Moving) {
+			var res = game.moveLinear(this.position, this.direction == Spring.Direction.Vertical ? this.vert : this.hor, this.size);
+			this.position = res.position;
 
-		if(res.collision) {
-			if(this.direction == Spring.Direction.Vertical)
-				this.vert.y = -this.vert.y;
-			else
-				this.hor.x = -this.hor.x;
+			if(res.collision) {
+				this.velocity.x = this.velocity.y = 0;
+				this.state = Spring.State.Turning;
+				this.turnCounter = 0;
+			}
+		} else {
+			if(this.turnCounter >= Spring.TurnTime) {
+				if(this.direction == Spring.Direction.Vertical)
+					this.vert.y = -this.vert.y;
+				else
+					this.hor.x = -this.hor.x;
+				this.state = Spring.State.Moving;
+			} else {
+				this.turnCounter += delta;
+			}
 		}
 	},
 
